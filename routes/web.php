@@ -1,16 +1,35 @@
 <?php
 
-use App\Themes\Facades\Theme;
-use App\Themes\Factories\ThemeFactory;
-use App\Themes\Managers\ThemeManager;
-use App\Themes\Strategies\DefaultTheme;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 
 Route::get('/', function () {
 
-    /* $theme = app('theme');
-    return $theme->view('welcome'); */
+    $filesystem = new Filesystem();
 
-    return Theme::view('welcome', ['name' => 'World']);
+    $strategyPath = app_path('Themes/Strategies');
 
+    $themes = collect($filesystem->files($strategyPath))
+        ->filter(function ($file) {
+            return Str::endsWith($file->getFilename(), 'Theme.php');
+        })->mapWithKeys(function($file){
+
+            $class = $file->getFilenameWithoutExtension(); //DefaultTheme
+            $key = Str::kebab(Str::before($class, 'Theme')); //default
+
+            return [
+                $key => $class,
+            ];
+        });
+
+    $imports = $themes->map(function($class){
+        return "use App\\Themes\\Contracts\\{$class};";
+    })->implode("\n");
+
+    $cases = $themes->map(function($class, $key){
+        return "'{$key}' => new {$class}(),";
+    })->implode("\n");
+
+    return $cases;
 });
